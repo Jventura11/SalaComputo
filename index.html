@@ -204,7 +204,15 @@ function loadConfig(){
 // ══════════════════ SETUP ══════════════════
 function initSetup(){
   show("viewSetup");
-  document.getElementById("setupUrl").value=API_URL;
+  var urlField=document.getElementById("setupUrl");
+  urlField.value=API_URL;
+  // Si ya hay URL configurada, ocultarla (protegida); solo visible en primera instalación
+  var urlWrap=urlField.closest(".field");
+  if(API_URL){
+    urlWrap.classList.add("hidden");
+  }else{
+    urlWrap.classList.remove("hidden");
+  }
   var sel=document.getElementById("setupEq");var o="";
   for(var i=1;i<=40;i++)o+='<option value="'+i+'">Equipo '+i+'</option>';
   sel.innerHTML=o;
@@ -215,7 +223,8 @@ function initSetup(){
 }
 
 function saveSetup(){
-  var url=document.getElementById("setupUrl").value.trim();
+  var urlInput=document.getElementById("setupUrl").value.trim();
+  var url=urlInput||API_URL; // si el campo está oculto, conserva la URL existente
   var mode=document.getElementById("setupMode").value;
   if(!url||!url.endsWith("/exec")){showToast("⚠️ La URL debe terminar en /exec",4000);return;}
   API_URL=url;localStorage.setItem("salacomputo_url",url);
@@ -228,9 +237,34 @@ function saveSetup(){
 }
 
 function resetDevice(){
-  if(!confirm("¿Reconfigurar este dispositivo?"))return;
-  localStorage.removeItem("salacomputo_mode");localStorage.removeItem("salacomputo_eq");
-  DEVICE_MODE="";DEVICE_EQ=0;initSetup();
+  // Protegido con PIN de administrador para evitar cambios por alumnos
+  var o=document.createElement("div");o.className="modal-overlay";
+  o.innerHTML='<div class="modal" style="max-width:340px;text-align:center"><h3>🔒 Acceso restringido</h3>'+
+    '<p style="color:var(--muted);font-size:13px;margin:10px 0 16px">Solo el administrador puede reconfigurar este dispositivo</p>'+
+    '<div class="field"><input id="resetPin" type="password" maxlength="10" placeholder="PIN de administrador" style="text-align:center;font-size:18px;letter-spacing:6px"></div>'+
+    '<div id="resetErr" style="color:var(--danger);font-size:13px;margin-bottom:10px"></div>'+
+    '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="verifyResetPin()">Verificar</button></div></div>';
+  document.body.appendChild(o);
+  o.addEventListener("click",function(e){if(e.target===o)o.remove();});
+  setTimeout(function(){var i=document.getElementById("resetPin");if(i)i.focus();},100);
+}
+
+function verifyResetPin(){
+  var pin=document.getElementById("resetPin").value.trim();
+  var err=document.getElementById("resetErr");
+  if(!pin){err.textContent="Ingrese el PIN";return;}
+  err.textContent="⏳ Verificando...";
+  api("action=adminLogin&pin="+encodeURIComponent(pin)).then(function(r){
+    if(r.success){
+      document.querySelector(".modal-overlay").remove();
+      localStorage.removeItem("salacomputo_mode");localStorage.removeItem("salacomputo_eq");
+      localStorage.removeItem("salacomputo_session");
+      DEVICE_MODE="";DEVICE_EQ=0;kioskSession=null;
+      initSetup();
+      showToast("✅ Dispositivo desbloqueado para reconfigurar");
+    }else{err.textContent="❌ PIN incorrecto";}
+  }).catch(function(e){err.textContent="❌ "+e.message;});
 }
 
 // ══════════════════ KIOSCO ══════════════════
