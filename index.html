@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SalaCómputo</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#EEF2F4;--card:#FFF;--border:#DDE3E8;--primary:#0F4C5C;--primary-lt:#186678;--accent:#E36414;--text:#1F2937;--muted:#6B7280;--danger:#DC2626;--success:#059669;--warn:#F59E0B;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.08)}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+.header{background:var(--primary);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header h1{font-size:17px;font-weight:700}.header small{font-size:11px;color:#9FC5CF;display:block;margin-top:1px}
+.header-right{display:flex;gap:8px;align-items:center}
+.header-btn{background:rgba(255,255,255,.12);border:none;color:#B8D4DC;width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px}
+.header-btn:hover{background:rgba(255,255,255,.25);color:#fff}
+.container{max-width:900px;margin:0 auto;padding:16px 16px 90px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:var(--shadow)}
+.section-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;color:var(--primary)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;font-family:inherit}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary)}
+.field textarea{min-height:80px;resize:vertical}
+.btn{padding:12px 20px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-lt)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-success{background:var(--success);color:#fff}
+.btn-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
+.btn-danger{background:transparent;color:var(--danger);border:1.5px solid var(--danger);font-size:13px}
+.btn-whatsapp{background:#25D366;color:#fff}
+.btn-ghost{background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;font-weight:600;padding:6px 0;width:auto}
+.btn-sm{padding:8px 14px;font-size:13px;width:auto}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.actions-row{display:flex;gap:10px}.actions-row .btn{flex:1}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-libre{background:#D1FAE5;color:#065F46}.badge-ocupado{background:#DBEAFE;color:#1E40AF}
+.badge-falla{background:#FEE2E2;color:#991B1B}
+.badge-alta{background:#FEE2E2;color:#991B1B}.badge-media{background:#FEF3C7;color:#92400E}.badge-baja{background:#E5E7EB;color:#374151}
+.badge-abierto{background:#FEE2E2;color:#991B1B}.badge-resuelto{background:#D1FAE5;color:#065F46}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0F2C35;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:14px;padding:24px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto}
+.hidden{display:none!important}
+hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+.tab-bar{display:flex;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:54px;z-index:90}
+.tab-bar button{flex:1;padding:12px;font-size:13px;font-weight:500;color:var(--muted);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent}
+.tab-bar button.active{color:var(--primary);font-weight:700;border-bottom-color:var(--accent)}
+/* Kiosk */
+.kiosk-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#0F4C5C,#186678)}
+.kiosk-card{background:#fff;border-radius:20px;padding:36px;max-width:440px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);text-align:center}
+.kiosk-card .big-num{font-size:64px;font-weight:800;color:var(--primary);line-height:1}
+.kiosk-card h2{color:var(--primary);margin:8px 0 4px}
+.kiosk-active{background:linear-gradient(135deg,#065F46,#059669)}
+/* Equipment grid */
+.eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.eq-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:transform .1s;position:relative}
+.eq-card:active{transform:scale(.97)}
+.eq-card.st-libre{border-color:#A7F3D0}.eq-card.st-ocupado{border-color:#93C5FD;background:#EFF6FF}
+.eq-card.st-falla{border-color:#FCA5A5;background:#FEF2F2}
+.eq-num{font-size:26px;font-weight:800;color:var(--primary)}
+.eq-users{font-size:11px;color:var(--muted);margin-top:4px;min-height:28px;overflow:hidden}
+.tk-row{padding:12px 0;border-bottom:1px solid #F3F4F6}
+.hist-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #F3F4F6;font-size:13px;flex-wrap:wrap;gap:4px}
+.stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+.stat-card .num{font-size:30px;font-weight:800}
+.stat-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+@media(max-width:520px){.eq-grid{grid-template-columns:repeat(3,1fr)}.stat-cards{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- ═══ SETUP INICIAL (elegir modo) ═══ -->
+<div id="viewSetup" class="kiosk-wrap hidden">
+  <div class="kiosk-card">
+    <div style="font-size:48px">💻</div>
+    <h2>SalaCómputo</h2>
+    <p style="color:var(--muted);margin-bottom:20px">Configuración inicial de este dispositivo</p>
+    <div class="field" style="text-align:left"><label>URL del servidor (Apps Script /exec)</label>
+      <input id="setupUrl" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:11px"></div>
+    <div class="field" style="text-align:left"><label>Modo de este dispositivo</label>
+      <select id="setupMode"><option value="kiosk">🖥️ Equipo de alumnos (kiosco)</option><option value="admin">👨‍🏫 Profesor / Administrador</option></select></div>
+    <div class="field hidden" id="setupEqWrap" style="text-align:left"><label>Número de este equipo</label>
+      <select id="setupEq"></select></div>
+    <button class="btn btn-primary" onclick="saveSetup()">Guardar y continuar</button>
+  </div>
+</div>
+
+<!-- ═══ KIOSCO: INICIO DE SESIÓN ALUMNOS ═══ -->
+<div id="viewKioskStart" class="kiosk-wrap hidden">
+  <div class="kiosk-card">
+    <div class="big-num" id="kioskNum">--</div>
+    <h2>Equipo de cómputo</h2>
+    <p style="color:var(--muted);margin-bottom:22px">Registra tu nombre para usar este equipo</p>
+    <div class="field" style="text-align:left"><label>Alumno 1 *</label><input id="kAlumno1" placeholder="Nombre completo"></div>
+    <div class="field" style="text-align:left"><label>Alumno 2 (opcional)</label><input id="kAlumno2" placeholder="Nombre completo"></div>
+    <button class="btn btn-success" onclick="startKioskSession()" style="font-size:17px;padding:14px">▶️ Iniciar sesión</button>
+    <button class="btn-ghost" style="margin-top:14px;font-size:12px;color:var(--muted)" onclick="resetDevice()">⚙️ Reconfigurar dispositivo</button>
+  </div>
+</div>
+
+<!-- ═══ KIOSCO: SESIÓN ACTIVA ═══ -->
+<div id="viewKioskActive" class="kiosk-wrap kiosk-active hidden">
+  <div class="kiosk-card">
+    <div class="big-num" style="color:var(--success)" id="kioskNumActive">--</div>
+    <h2 style="color:var(--success)">Equipo en uso</h2>
+    <div id="kioskUsers" style="font-size:17px;font-weight:600;margin:14px 0;color:var(--text)"></div>
+    <div id="kioskTimer" style="font-size:13px;color:var(--muted);margin-bottom:22px"></div>
+    <button class="btn btn-danger" onclick="endKioskSession()" style="font-size:17px;padding:14px;background:#FEE2E2;border:none;color:#991B1B">⏹️ Terminar sesión</button>
+    <button class="btn btn-outline" style="margin-top:10px" onclick="showKioskReport()">⚠️ Reportar problema con este equipo</button>
+  </div>
+</div>
+
+<!-- ═══ ADMIN: LOGIN ═══ -->
+<div id="viewAdminLogin" class="kiosk-wrap hidden">
+  <div class="kiosk-card">
+    <div style="font-size:48px">👨‍🏫</div>
+    <h2>Panel del Profesor</h2>
+    <p style="color:var(--muted);margin-bottom:20px">Ingrese su PIN de administrador</p>
+    <div class="field"><input id="adminPin" type="password" maxlength="10" placeholder="PIN" style="text-align:center;font-size:20px;letter-spacing:8px"></div>
+    <button class="btn btn-primary" onclick="doAdminLogin()">Entrar</button>
+    <div id="adminLoginErr" style="color:var(--danger);font-size:13px;margin-top:10px"></div>
+    <button class="btn-ghost" style="margin-top:14px;font-size:12px;color:var(--muted)" onclick="resetDevice()">⚙️ Reconfigurar dispositivo</button>
+  </div>
+</div>
+
+<!-- ═══ ADMIN: PANEL ═══ -->
+<div id="viewAdmin" class="hidden">
+  <div class="header">
+    <div><h1>💻 SalaCómputo</h1><small>Panel del Profesor</small></div>
+    <div class="header-right">
+      <button class="header-btn" onclick="loadAdminData()" title="Actualizar">🔄</button>
+      <button class="header-btn" onclick="showAdminConfig()" title="Configuración">⚙️</button>
+      <button class="header-btn" onclick="adminLogout()" title="Salir">🚪</button>
+    </div>
+  </div>
+  <div class="tab-bar" id="adminTabs"></div>
+  <div class="container" id="adminContent"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════ GLOBALS ══════════════════
+var API_URL=localStorage.getItem("salacomputo_url")||"";
+var DEVICE_MODE=localStorage.getItem("salacomputo_mode")||"";
+var DEVICE_EQ=parseInt(localStorage.getItem("salacomputo_eq"))||0;
+var kioskSession=JSON.parse(localStorage.getItem("salacomputo_session")||"null");
+var NUM_EQ=20, TECNICO_WA="";
+var sesiones=[],tickets=[],historial=[];
+var adminTab="equipos";
+var adminAuth=sessionStorage.getItem("salacomputo_admin")==="1";
+var timerInterval=null;
+
+function showToast(m,d){var t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(function(){t.classList.remove("show");},d||3000);}
+function fmtDT(iso){if(!iso)return"";var d=new Date(iso);return d.getDate()+"/"+(d.getMonth()+1)+" "+d.getHours()+":"+String(d.getMinutes()).padStart(2,"0");}
+function escH(s){return String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function elapsed(iso){var m=Math.floor((Date.now()-new Date(iso))/60000);if(m<60)return m+" min";return Math.floor(m/60)+"h "+(m%60)+"m";}
+
+// ══════════════════ API JSONP ══════════════════
+var jc=0;
+function api(params){
+  return new Promise(function(res,rej){
+    if(!API_URL){rej(new Error("URL no configurada"));return;}
+    var cb="_sccb_"+(++jc);
+    var to=setTimeout(function(){delete window[cb];var e=document.getElementById(cb);if(e)e.remove();rej(new Error("Timeout"));},20000);
+    window[cb]=function(d){clearTimeout(to);delete window[cb];var e=document.getElementById(cb);if(e)e.remove();res(d);};
+    var s=document.createElement("script");s.id=cb;s.src=API_URL+"?jsonpcb="+cb+"&"+params;
+    s.onerror=function(){clearTimeout(to);delete window[cb];s.remove();rej(new Error("Error de red"));};
+    document.body.appendChild(s);
+  });
+}
+
+// ══════════════════ NAVIGATION ══════════════════
+function show(id){
+  ["viewSetup","viewKioskStart","viewKioskActive","viewAdminLogin","viewAdmin"].forEach(function(v){
+    document.getElementById(v).classList.toggle("hidden",v!==id);
+  });
+}
+
+function boot(){
+  if(!API_URL||!DEVICE_MODE){initSetup();return;}
+  loadConfig().then(function(){
+    if(DEVICE_MODE==="kiosk"){
+      if(kioskSession)showKioskActive();
+      else{document.getElementById("kioskNum").textContent=DEVICE_EQ;show("viewKioskStart");}
+    }else{
+      if(adminAuth){show("viewAdmin");initAdmin();}
+      else show("viewAdminLogin");
+    }
+  }).catch(function(){
+    if(DEVICE_MODE==="kiosk"){document.getElementById("kioskNum").textContent=DEVICE_EQ;show(kioskSession?"viewKioskActive":"viewKioskStart");}
+    else show("viewAdminLogin");
+  });
+}
+
+function loadConfig(){
+  return api("action=getConfig").then(function(r){
+    if(r.success){NUM_EQ=parseInt(r.config.num_equipos)||20;TECNICO_WA=r.config.tecnico_whatsapp||"";}
+  });
+}
+
+// ══════════════════ SETUP ══════════════════
+function initSetup(){
+  show("viewSetup");
+  document.getElementById("setupUrl").value=API_URL;
+  var sel=document.getElementById("setupEq");var o="";
+  for(var i=1;i<=40;i++)o+='<option value="'+i+'">Equipo '+i+'</option>';
+  sel.innerHTML=o;
+  document.getElementById("setupMode").addEventListener("change",function(){
+    document.getElementById("setupEqWrap").classList.toggle("hidden",this.value!=="kiosk");
+  });
+  document.getElementById("setupEqWrap").classList.remove("hidden");
+}
+
+function saveSetup(){
+  var url=document.getElementById("setupUrl").value.trim();
+  var mode=document.getElementById("setupMode").value;
+  if(!url||!url.endsWith("/exec")){showToast("⚠️ La URL debe terminar en /exec",4000);return;}
+  API_URL=url;localStorage.setItem("salacomputo_url",url);
+  DEVICE_MODE=mode;localStorage.setItem("salacomputo_mode",mode);
+  if(mode==="kiosk"){
+    DEVICE_EQ=parseInt(document.getElementById("setupEq").value);
+    localStorage.setItem("salacomputo_eq",DEVICE_EQ);
+  }
+  showToast("✅ Configurado");boot();
+}
+
+function resetDevice(){
+  if(!confirm("¿Reconfigurar este dispositivo?"))return;
+  localStorage.removeItem("salacomputo_mode");localStorage.removeItem("salacomputo_eq");
+  DEVICE_MODE="";DEVICE_EQ=0;initSetup();
+}
+
+// ══════════════════ KIOSCO ══════════════════
+function startKioskSession(){
+  var a1=document.getElementById("kAlumno1").value.trim();
+  var a2=document.getElementById("kAlumno2").value.trim();
+  if(!a1){alert("Escribe al menos el nombre del Alumno 1");return;}
+  showToast("⏳ Iniciando...");
+  api("action=startSesion&equipo="+DEVICE_EQ+"&alumno1="+encodeURIComponent(a1)+"&alumno2="+encodeURIComponent(a2)).then(function(r){
+    if(r.success){
+      kioskSession={id:r.id,alumno1:a1,alumno2:a2,inicio:new Date().toISOString()};
+      localStorage.setItem("salacomputo_session",JSON.stringify(kioskSession));
+      document.getElementById("kAlumno1").value="";document.getElementById("kAlumno2").value="";
+      showKioskActive();showToast("✅ Sesión iniciada");
+    }else showToast("❌ "+r.error,4000);
+  }).catch(function(e){showToast("❌ "+e.message,4000);});
+}
+
+function showKioskActive(){
+  show("viewKioskActive");
+  document.getElementById("kioskNumActive").textContent=DEVICE_EQ;
+  var u=escH(kioskSession.alumno1);
+  if(kioskSession.alumno2)u+="<br>"+escH(kioskSession.alumno2);
+  document.getElementById("kioskUsers").innerHTML=u;
+  if(timerInterval)clearInterval(timerInterval);
+  var upd=function(){document.getElementById("kioskTimer").textContent="Tiempo de uso: "+elapsed(kioskSession.inicio);};
+  upd();timerInterval=setInterval(upd,30000);
+}
+
+function endKioskSession(){
+  if(!confirm("¿Terminar la sesión de este equipo?"))return;
+  showToast("⏳ Cerrando...");
+  api("action=endSesion&id="+encodeURIComponent(kioskSession.id)).then(function(r){
+    kioskSession=null;localStorage.removeItem("salacomputo_session");
+    if(timerInterval)clearInterval(timerInterval);
+    document.getElementById("kioskNum").textContent=DEVICE_EQ;
+    show("viewKioskStart");showToast("✅ Sesión terminada. ¡Gracias!");
+  }).catch(function(e){
+    kioskSession=null;localStorage.removeItem("salacomputo_session");
+    show("viewKioskStart");
+  });
+}
+
+function showKioskReport(){
+  var o=document.createElement("div");o.className="modal-overlay";
+  o.innerHTML='<div class="modal"><h3>⚠️ Reportar problema — Equipo '+DEVICE_EQ+'</h3>'+
+    '<div class="field" style="margin-top:14px"><label>¿Qué problema tiene? *</label><textarea id="krProblema" placeholder="Ej: No enciende el monitor, teclado no funciona, está muy lento..."></textarea></div>'+
+    '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
+    '<button class="btn btn-accent" onclick="sendKioskReport()">Enviar reporte</button></div></div>';
+  document.body.appendChild(o);
+}
+
+function sendKioskReport(){
+  var prob=document.getElementById("krProblema").value.trim();
+  if(!prob){alert("Describe el problema");return;}
+  var reporter=kioskSession?kioskSession.alumno1:"Alumno";
+  api("action=createTicket&equipo="+DEVICE_EQ+"&problema="+encodeURIComponent(prob)+"&severidad=media&reportadoPor="+encodeURIComponent(reporter)).then(function(r){
+    if(r.success){document.querySelector(".modal-overlay").remove();showToast("✅ Problema reportado al profesor");}
+    else showToast("❌ "+r.error,4000);
+  }).catch(function(e){showToast("❌ "+e.message,4000);});
+}
+
+// ══════════════════ ADMIN ══════════════════
+function doAdminLogin(){
+  var pin=document.getElementById("adminPin").value.trim();
+  var err=document.getElementById("adminLoginErr");
+  if(!pin){err.textContent="Ingrese el PIN";return;}
+  err.textContent="Verificando...";
+  api("action=adminLogin&pin="+encodeURIComponent(pin)).then(function(r){
+    if(r.success){adminAuth=true;sessionStorage.setItem("salacomputo_admin","1");err.textContent="";show("viewAdmin");initAdmin();}
+    else err.textContent="❌ "+r.error;
+  }).catch(function(e){err.textContent="❌ "+e.message;});
+}
+
+function adminLogout(){adminAuth=false;sessionStorage.removeItem("salacomputo_admin");show("viewAdminLogin");document.getElementById("adminPin").value="";}
+
+function initAdmin(){adminTab="equipos";renderAdminTabs();loadAdminData();}
+
+function renderAdminTabs(){
+  var tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["historial","📋 Historial"]];
+  document.getElementById("adminTabs").innerHTML=tabs.map(function(t){
+    return'<button class="'+(adminTab===t[0]?"active":"")+'" onclick="switchAdminTab(\''+t[0]+'\')">'+t[1]+'</button>';
+  }).join("");
+}
+
+function switchAdminTab(t){adminTab=t;renderAdminTabs();renderAdminContent();}
+
+function loadAdminData(){
+  showToast("⏳ Actualizando...");
+  Promise.all([
+    api("action=getEstado").then(function(r){if(r.success){sesiones=r.sesiones;tickets=r.tickets;}}),
+    api("action=getHistorial").then(function(r){if(r.success)historial=r.sesiones;}),
+    loadConfig()
+  ]).then(function(){renderAdminContent();showToast("✅ Actualizado");}).catch(function(e){showToast("❌ "+e.message,4000);});
+}
+
+function renderAdminContent(){
+  if(adminTab==="equipos")renderEquipos();
+  else if(adminTab==="tickets")renderTickets();
+  else renderHistorial();
+}
+
+function eqStatus(n){
+  var falla=tickets.some(function(t){return t.equipo===n&&t.estado==="abierto";});
+  var ses=sesiones.find(function(s){return s.equipo===n;});
+  if(falla)return{st:"falla",ses:ses};
+  if(ses)return{st:"ocupado",ses:ses};
+  return{st:"libre",ses:null};
+}
+
+function renderEquipos(){
+  var c=document.getElementById("adminContent");
+  var libres=0,ocupados=0,fallas=0;
+  var grid='<div class="eq-grid">';
+  for(var i=1;i<=NUM_EQ;i++){
+    var s=eqStatus(i);
+    if(s.st==="libre")libres++;else if(s.st==="ocupado")ocupados++;else fallas++;
+    var users=s.ses?escH(s.ses.alumno1)+(s.ses.alumno2?"<br>"+escH(s.ses.alumno2):""):"";
+    var badge=s.st==="libre"?'<span class="badge badge-libre">Libre</span>':s.st==="ocupado"?'<span class="badge badge-ocupado">En uso</span>':'<span class="badge badge-falla">Falla</span>';
+    grid+='<div class="eq-card st-'+s.st+'" onclick="openEquipo('+i+')"><div class="eq-num">'+i+'</div>'+badge+'<div class="eq-users">'+users+'</div></div>';
+  }
+  grid+='</div>';
+  var stats='<div class="stat-cards">'+
+    '<div class="stat-card"><div class="num" style="color:var(--success)">'+libres+'</div><div class="lbl">Libres</div></div>'+
+    '<div class="stat-card"><div class="num" style="color:#2563EB">'+ocupados+'</div><div class="lbl">En uso</div></div>'+
+    '<div class="stat-card"><div class="num" style="color:var(--danger)">'+fallas+'</div><div class="lbl">Con falla</div></div></div>';
+  c.innerHTML=stats+grid;
+}
+
+function openEquipo(n){
+  var s=eqStatus(n);
+  var eqTickets=tickets.filter(function(t){return t.equipo===n;});
+  var o=document.createElement("div");o.className="modal-overlay";
+  var html='<div class="modal"><h3>🖥️ Equipo '+n+'</h3>';
+  if(s.ses){
+    html+='<div class="card" style="margin-top:12px;background:#EFF6FF"><div class="section-label" style="color:#1E40AF">Sesión activa</div>';
+    html+='<div style="font-weight:600">'+escH(s.ses.alumno1)+(s.ses.alumno2?" y "+escH(s.ses.alumno2):"")+'</div>';
+    html+='<div style="font-size:12px;color:var(--muted);margin-top:4px">Desde: '+fmtDT(s.ses.inicio)+' ('+elapsed(s.ses.inicio)+')</div>';
+    html+='<button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="adminEndSession(\''+s.ses.id+'\');this.closest(\'.modal-overlay\').remove()">Forzar cierre de sesión</button></div>';
+  }else{
+    html+='<p style="color:var(--muted);margin:12px 0">Sin sesión activa</p>';
+  }
+  if(eqTickets.length){
+    html+='<div class="section-label" style="margin-top:14px">Tickets de este equipo</div>';
+    eqTickets.forEach(function(t){
+      html+='<div class="tk-row"><div style="display:flex;justify-content:space-between;align-items:center"><span class="badge badge-'+t.estado+'">'+t.estado+'</span><span style="font-size:11px;color:var(--muted)">'+fmtDT(t.fecha)+'</span></div>';
+      html+='<div style="margin-top:6px">'+escH(t.problema)+'</div>';
+      if(t.reportadoPor)html+='<div style="font-size:11px;color:var(--muted)">Reportó: '+escH(t.reportadoPor)+'</div>';
+      html+='</div>';
+    });
+  }
+  html+='<button class="btn btn-accent" style="margin-top:14px" onclick="showCreateTicket('+n+');this.closest(\'.modal-overlay\').remove()">🎫 Levantar ticket</button>';
+  html+='<button class="btn btn-outline" style="margin-top:8px" onclick="this.closest(\'.modal-overlay\').remove()">Cerrar</button></div>';
+  o.innerHTML=html;document.body.appendChild(o);
+  o.addEventListener("click",function(e){if(e.target===o)o.remove();});
+}
+
+function adminEndSession(id){
+  api("action=endSesion&id="+encodeURIComponent(id)).then(function(){showToast("✅ Sesión cerrada");loadAdminData();});
+}
+
+function showCreateTicket(eq){
+  var o=document.createElement("div");o.className="modal-overlay";
+  var opts="";for(var i=1;i<=NUM_EQ;i++)opts+='<option value="'+i+'"'+(eq===i?" selected":"")+'>Equipo '+i+'</option>';
+  o.innerHTML='<div class="modal"><h3>🎫 Nuevo Ticket</h3>'+
+    '<div class="field" style="margin-top:12px"><label>Equipo *</label><select id="tkEq">'+opts+'</select></div>'+
+    '<div class="field"><label>Problema *</label><textarea id="tkProb" placeholder="Describe la falla..."></textarea></div>'+
+    '<div class="field"><label>Severidad</label><select id="tkSev"><option value="baja">🟢 Baja</option><option value="media" selected>🟡 Media</option><option value="alta">🔴 Alta</option></select></div>'+
+    '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
+    '<button class="btn btn-accent" onclick="saveTicket()">Crear ticket</button></div></div>';
+  document.body.appendChild(o);
+}
+
+function saveTicket(){
+  var eq=document.getElementById("tkEq").value;
+  var prob=document.getElementById("tkProb").value.trim();
+  var sev=document.getElementById("tkSev").value;
+  if(!prob){alert("Describe el problema");return;}
+  api("action=createTicket&equipo="+eq+"&problema="+encodeURIComponent(prob)+"&severidad="+sev+"&reportadoPor=Profesor").then(function(r){
+    if(r.success){document.querySelector(".modal-overlay").remove();showToast("✅ Ticket creado");loadAdminData();}
+  });
+}
+
+function renderTickets(){
+  var c=document.getElementById("adminContent");
+  var abiertos=tickets.filter(function(t){return t.estado==="abierto";});
+  var resueltos=tickets.filter(function(t){return t.estado==="resuelto";});
+  var html='';
+  html+='<button class="btn btn-whatsapp" style="margin-bottom:12px" onclick="sendTechReport()" '+(abiertos.length?"":"disabled")+'>📱 Enviar reporte al técnico ('+abiertos.length+' fallas)</button>';
+  html+='<button class="btn btn-accent" style="margin-bottom:12px" onclick="showCreateTicket(1)">🎫 Nuevo ticket</button>';
+  if(abiertos.length){
+    html+='<div class="card"><div class="section-label" style="color:var(--danger)">Tickets abiertos ('+abiertos.length+')</div>';
+    abiertos.forEach(function(t){html+=ticketRow(t);});
+    html+='</div>';
+  }
+  if(resueltos.length){
+    html+='<div class="card"><div class="section-label" style="color:var(--success)">Resueltos ('+resueltos.length+')</div>';
+    resueltos.slice(-10).reverse().forEach(function(t){html+=ticketRow(t);});
+    html+='</div>';
+  }
+  if(!tickets.length)html+='<div style="text-align:center;padding:50px;color:var(--muted)"><div style="font-size:40px">🎫</div><div style="font-weight:600;margin-top:8px">Sin tickets</div></div>';
+  c.innerHTML=html;
+}
+
+function ticketRow(t){
+  var h='<div class="tk-row"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
+  h+='<div><strong>Equipo '+t.equipo+'</strong> <span class="badge badge-'+t.severidad+'">'+t.severidad+'</span> <span class="badge badge-'+t.estado+'">'+t.estado+'</span></div>';
+  h+='<span style="font-size:11px;color:var(--muted)">'+fmtDT(t.fecha)+'</span></div>';
+  h+='<div style="margin-top:6px">'+escH(t.problema)+'</div>';
+  if(t.reportadoPor)h+='<div style="font-size:11px;color:var(--muted);margin-top:2px">Reportó: '+escH(t.reportadoPor)+'</div>';
+  h+='<div style="display:flex;gap:8px;margin-top:8px">';
+  if(t.estado==="abierto")h+='<button class="btn btn-success btn-sm" onclick="updateTicket(\''+t.id+'\',\'resuelto\')">✓ Resolver</button>';
+  else h+='<button class="btn btn-outline btn-sm" onclick="updateTicket(\''+t.id+'\',\'abierto\')">Reabrir</button>';
+  h+='<button class="btn btn-danger btn-sm" onclick="delTicket(\''+t.id+'\')">Eliminar</button></div></div>';
+  return h;
+}
+
+function updateTicket(id,estado){
+  api("action=updateTicket&id="+encodeURIComponent(id)+"&estado="+estado).then(function(){showToast("✅ Ticket actualizado");loadAdminData();});
+}
+function delTicket(id){
+  if(!confirm("¿Eliminar ticket?"))return;
+  api("action=delTicket&id="+encodeURIComponent(id)).then(function(){showToast("Ticket eliminado");loadAdminData();});
+}
+
+function sendTechReport(){
+  var abiertos=tickets.filter(function(t){return t.estado==="abierto";});
+  if(!abiertos.length){showToast("No hay fallas abiertas");return;}
+  var SEV={alta:"🔴 ALTA",media:"🟡 Media",baja:"🟢 Baja"};
+  var msg="🖥️ *REPORTE DE FALLAS - SALA DE CÓMPUTO*\n━━━━━━━━━━━━━━━━━━━━━\n📅 "+new Date().toLocaleDateString("es-MX")+"\n\n*"+abiertos.length+" equipo(s) con falla:*\n";
+  abiertos.sort(function(a,b){return a.equipo-b.equipo;}).forEach(function(t){
+    msg+="\n💻 *Equipo "+t.equipo+"* — "+SEV[t.severidad]+"\n   "+t.problema+"\n   _Reportado: "+fmtDT(t.fecha)+"_\n";
+  });
+  msg+="\n━━━━━━━━━━━━━━━━━━━━━\n_Enviado desde SalaCómputo_";
+  var url=TECNICO_WA?"https://wa.me/"+TECNICO_WA.replace(/\D/g,"")+"?text=":"https://wa.me/?text=";
+  window.open(url+encodeURIComponent(msg),"_blank");
+}
+
+function renderHistorial(){
+  var c=document.getElementById("adminContent");
+  if(!historial.length){c.innerHTML='<div style="text-align:center;padding:50px;color:var(--muted)"><div style="font-size:40px">📋</div><div style="font-weight:600;margin-top:8px">Sin registros</div></div>';return;}
+  var html='<div class="card"><div class="section-label">Bitácora de uso (últimas '+historial.length+' sesiones)</div>';
+  historial.forEach(function(s){
+    html+='<div class="hist-row"><div><strong>Eq. '+s.equipo+'</strong> — '+escH(s.alumno1)+(s.alumno2?" y "+escH(s.alumno2):"")+(s.activa?' <span class="badge badge-ocupado">Activa</span>':'')+'</div>';
+    html+='<div style="color:var(--muted)">'+fmtDT(s.inicio)+(s.fin?" → "+fmtDT(s.fin):"")+'</div></div>';
+  });
+  html+='</div>';
+  c.innerHTML=html;
+}
+
+function showAdminConfig(){
+  var o=document.createElement("div");o.className="modal-overlay";
+  o.innerHTML='<div class="modal"><h3>⚙️ Configuración</h3>'+
+    '<div class="field" style="margin-top:12px"><label>Número de equipos en la sala</label><input id="cfgNum" type="number" value="'+NUM_EQ+'" min="1" max="40"></div>'+
+    '<div class="field"><label>WhatsApp del técnico (10 dígitos)</label><input id="cfgTec" type="tel" value="'+escH(TECNICO_WA)+'" placeholder="9991234567"></div>'+
+    '<div class="field"><label>Cambiar PIN de administrador</label><input id="cfgPin" type="password" placeholder="Nuevo PIN (dejar vacío para no cambiar)"></div>'+
+    '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="saveAdminConfig()">Guardar</button></div></div>';
+  document.body.appendChild(o);
+}
+
+function saveAdminConfig(){
+  var num=document.getElementById("cfgNum").value;
+  var tec=document.getElementById("cfgTec").value.trim();
+  var pin=document.getElementById("cfgPin").value.trim();
+  var calls=[
+    api("action=updateConfig&key=num_equipos&value="+encodeURIComponent(num)),
+    api("action=updateConfig&key=tecnico_whatsapp&value="+encodeURIComponent(tec))
+  ];
+  if(pin)calls.push(api("action=updateConfig&key=admin_pin&value="+encodeURIComponent(pin)));
+  Promise.all(calls).then(function(){
+    NUM_EQ=parseInt(num)||20;TECNICO_WA=tec;
+    document.querySelector(".modal-overlay").remove();
+    showToast("✅ Configuración guardada");renderAdminContent();
+  });
+}
+
+// ══════════════════ INIT ══════════════════
+boot();
+</script>
+</body>
+</html>
