@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SalaCómputo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#EEF2F4;--card:#FFF;--border:#DDE3E8;--primary:#0F4C5C;--primary-lt:#186678;--accent:#E36414;--text:#1F2937;--muted:#6B7280;--danger:#DC2626;--success:#059669;--warn:#F59E0B;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -503,16 +504,119 @@ function sendTechReport(){
   window.open(url+encodeURIComponent(msg),"_blank");
 }
 
+var histFilter={desde:"",hasta:"",equipo:"",buscar:""};
+
+function getFilteredHistorial(){
+  return historial.filter(function(s){
+    if(histFilter.equipo && Number(s.equipo)!==Number(histFilter.equipo))return false;
+    var d=new Date(s.inicio);
+    if(histFilter.desde){var fd=new Date(histFilter.desde+"T00:00:00");if(d<fd)return false;}
+    if(histFilter.hasta){var fh=new Date(histFilter.hasta+"T23:59:59");if(d>fh)return false;}
+    if(histFilter.buscar){
+      var q=histFilter.buscar.toLowerCase();
+      var names=(s.alumno1+" "+(s.alumno2||"")).toLowerCase();
+      if(names.indexOf(q)<0)return false;
+    }
+    return true;
+  });
+}
+
 function renderHistorial(){
   var c=document.getElementById("adminContent");
-  if(!historial.length){c.innerHTML='<div style="text-align:center;padding:50px;color:var(--muted)"><div style="font-size:40px">📋</div><div style="font-weight:600;margin-top:8px">Sin registros</div></div>';return;}
-  var html='<div class="card"><div class="section-label">Bitácora de uso (últimas '+historial.length+' sesiones)</div>';
-  historial.forEach(function(s){
-    html+='<div class="hist-row"><div><strong>Eq. '+s.equipo+'</strong> — '+escH(s.alumno1)+(s.alumno2?" y "+escH(s.alumno2):"")+(s.activa?' <span class="badge badge-ocupado">Activa</span>':'')+'</div>';
-    html+='<div style="color:var(--muted)">'+fmtDT(s.inicio)+(s.fin?" → "+fmtDT(s.fin):"")+'</div></div>';
-  });
+  var eqOpts='<option value="">Todos</option>';
+  for(var i=1;i<=NUM_EQ;i++)eqOpts+='<option value="'+i+'"'+(String(histFilter.equipo)===String(i)?" selected":"")+'>Equipo '+i+'</option>';
+
+  var filtered=getFilteredHistorial();
+
+  var html='<div class="card"><div class="section-label">🔍 Filtros</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  html+='<div class="field" style="margin-bottom:8px"><label>Desde</label><input id="fhDesde" type="date" value="'+histFilter.desde+'" onchange="applyHistFilter()"></div>';
+  html+='<div class="field" style="margin-bottom:8px"><label>Hasta</label><input id="fhHasta" type="date" value="'+histFilter.hasta+'" onchange="applyHistFilter()"></div>';
+  html+='<div class="field" style="margin-bottom:8px"><label>Equipo</label><select id="fhEquipo" onchange="applyHistFilter()">'+eqOpts+'</select></div>';
+  html+='<div class="field" style="margin-bottom:8px"><label>Buscar alumno</label><input id="fhBuscar" placeholder="Nombre..." value="'+escH(histFilter.buscar)+'" oninput="applyHistFilter()"></div>';
   html+='</div>';
+  html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">';
+  html+='<button class="btn btn-outline btn-sm" onclick="quickFilter(\'hoy\')">Hoy</button>';
+  html+='<button class="btn btn-outline btn-sm" onclick="quickFilter(\'semana\')">Esta semana</button>';
+  html+='<button class="btn btn-outline btn-sm" onclick="quickFilter(\'mes\')">Este mes</button>';
+  html+='<button class="btn btn-outline btn-sm" onclick="quickFilter(\'todo\')">Limpiar filtros</button>';
+  html+='</div></div>';
+
+  html+='<button class="btn btn-success" style="margin-bottom:12px" onclick="exportHistorial()" '+(filtered.length?"":"disabled")+'>📥 Exportar a Excel ('+filtered.length+' registros)</button>';
+
+  if(!filtered.length){
+    html+='<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:40px">📋</div><div style="font-weight:600;margin-top:8px">Sin registros con estos filtros</div></div>';
+  }else{
+    html+='<div class="card"><div class="section-label">Bitácora de uso ('+filtered.length+' de '+historial.length+' sesiones)</div>';
+    filtered.forEach(function(s){
+      html+='<div class="hist-row"><div><strong>Eq. '+s.equipo+'</strong> — '+escH(s.alumno1)+(s.alumno2?" y "+escH(s.alumno2):"")+(s.activa?' <span class="badge badge-ocupado">Activa</span>':'')+'</div>';
+      html+='<div style="color:var(--muted)">'+fmtDT(s.inicio)+(s.fin?" → "+fmtDT(s.fin):"")+'</div></div>';
+    });
+    html+='</div>';
+  }
   c.innerHTML=html;
+}
+
+function applyHistFilter(){
+  histFilter.desde=document.getElementById("fhDesde").value;
+  histFilter.hasta=document.getElementById("fhHasta").value;
+  histFilter.equipo=document.getElementById("fhEquipo").value;
+  var buscarEl=document.getElementById("fhBuscar");
+  var cursorPos=buscarEl.selectionStart;
+  histFilter.buscar=buscarEl.value;
+  renderHistorial();
+  // Restaurar foco en el campo de búsqueda
+  var newBuscar=document.getElementById("fhBuscar");
+  if(histFilter.buscar){newBuscar.focus();newBuscar.setSelectionRange(cursorPos,cursorPos);}
+}
+
+function quickFilter(tipo){
+  var now=new Date();
+  var toISO=function(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+  if(tipo==="hoy"){histFilter.desde=toISO(now);histFilter.hasta=toISO(now);}
+  else if(tipo==="semana"){
+    var mon=new Date(now);var day=mon.getDay()||7;mon.setDate(mon.getDate()-day+1);
+    histFilter.desde=toISO(mon);histFilter.hasta=toISO(now);
+  }
+  else if(tipo==="mes"){
+    histFilter.desde=toISO(new Date(now.getFullYear(),now.getMonth(),1));histFilter.hasta=toISO(now);
+  }
+  else{histFilter={desde:"",hasta:"",equipo:"",buscar:""};}
+  renderHistorial();
+}
+
+function calcDuracion(s){
+  if(!s.fin)return s.activa?"En curso":"";
+  var mins=Math.round((new Date(s.fin)-new Date(s.inicio))/60000);
+  if(mins<60)return mins+" min";
+  return Math.floor(mins/60)+"h "+(mins%60)+"m";
+}
+
+function exportHistorial(){
+  var filtered=getFilteredHistorial();
+  if(!filtered.length){showToast("Sin registros para exportar");return;}
+  var rows=filtered.map(function(s){
+    var di=new Date(s.inicio);
+    return{
+      "Equipo":s.equipo,
+      "Alumno 1":s.alumno1,
+      "Alumno 2":s.alumno2||"",
+      "Fecha":di.toLocaleDateString("es-MX"),
+      "Hora inicio":di.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}),
+      "Hora fin":s.fin?new Date(s.fin).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}):"",
+      "Duración":calcDuracion(s),
+      "Estado":s.activa?"Activa":"Finalizada"
+    };
+  });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  ws["!cols"]=[{wch:8},{wch:28},{wch:28},{wch:12},{wch:11},{wch:10},{wch:10},{wch:11}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Bitácora");
+  var suffix="";
+  if(histFilter.desde||histFilter.hasta)suffix="_"+(histFilter.desde||"inicio")+"_a_"+(histFilter.hasta||"hoy");
+  if(histFilter.equipo)suffix+="_Eq"+histFilter.equipo;
+  XLSX.writeFile(wb,"Bitacora_SalaComputo"+suffix+".xlsx");
+  showToast("✅ "+filtered.length+" registros exportados");
 }
 
 function showAdminConfig(){
