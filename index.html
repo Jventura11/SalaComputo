@@ -350,15 +350,15 @@ function doAdminLogin(){
 function adminLogout(){adminAuth=false;sessionStorage.removeItem("salacomputo_admin");sessionStorage.removeItem("salacomputo_role");show("viewAdminLogin");document.getElementById("adminPin").value="";}
 
 function initAdmin(){
-  adminTab=userRole==="tecnico"?"mantenimiento":"equipos";
+  adminTab=userRole==="tecnico"?"tickets":"equipos";
   document.querySelector("#viewAdmin .header small").textContent=userRole==="tecnico"?"Panel del Técnico":"Panel del Profesor";
   renderAdminTabs();loadAdminData();
 }
 
-function renderAdminTabs(){
+function renderTabs_admin(){
   var tabs;
   if(userRole==="tecnico"){
-    tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["mantenimiento","🔧 Mantenimiento"]];
+    tabs=[["tickets","🎫 Tickets"],["mantenimiento","🔧 Mantenimiento"]];
   }else{
     tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["historial","📋 Historial"],["mantenimiento","🔧 Mantenimiento"]];
   }
@@ -366,17 +366,21 @@ function renderAdminTabs(){
     return'<button class="'+(adminTab===t[0]?"active":"")+'" onclick="switchAdminTab(\''+t[0]+'\')">'+t[1]+'</button>';
   }).join("");
 }
+function renderAdminTabs(){renderTabs_admin();}
 
 function switchAdminTab(t){adminTab=t;renderAdminTabs();renderAdminContent();}
 
 function loadAdminData(){
   showToast("⏳ Actualizando...");
-  Promise.all([
+  var calls=[
     api("action=getEstado").then(function(r){if(r.success){sesiones=r.sesiones;tickets=r.tickets;}}),
-    api("action=getHistorial").then(function(r){if(r.success)historial=r.sesiones;}),
     api("action=getMants").then(function(r){if(r.success)mants=r.mants;}),
     loadConfig()
-  ]).then(function(){renderAdminContent();showToast("✅ Actualizado");}).catch(function(e){showToast("❌ "+e.message,4000);});
+  ];
+  if(userRole!=="tecnico"){
+    calls.push(api("action=getHistorial").then(function(r){if(r.success)historial=r.sesiones;}));
+  }
+  Promise.all(calls).then(function(){renderAdminContent();showToast("✅ Actualizado");}).catch(function(e){showToast("❌ "+e.message,4000);});
 }
 
 function renderAdminContent(){
@@ -682,13 +686,18 @@ function renderMantenimiento(){
   if(!filtered.length){
     html+='<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:40px">🔧</div><div style="font-weight:600;margin-top:8px">Sin mantenimientos'+(mants.length?" con estos filtros":" registrados")+'</div></div>';
   }else{
+    var totalCosto=filtered.reduce(function(sum,m){return sum+(m.costo||0);},0);
+    html+='<div class="card" style="background:#F0FDF4;border-color:#BBF7D0"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:#065F46">💰 Costo total del periodo filtrado:</span><span style="font-size:22px;font-weight:800;color:var(--success)">$'+totalCosto.toLocaleString("es-MX",{minimumFractionDigits:2})+'</span></div></div>';
     html+='<div class="card"><div class="section-label">Historial de mantenimiento ('+filtered.length+' de '+mants.length+')</div>';
     filtered.forEach(function(m){
       html+='<div class="tk-row"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
       html+='<div><strong>Equipo '+m.equipo+'</strong> <span class="badge '+(MANT_BADGE[m.tipo]||"badge-baja")+'">'+(MANT_TIPOS[m.tipo]||m.tipo)+'</span></div>';
       html+='<span style="font-size:11px;color:var(--muted)">'+fmtDT(m.fecha)+'</span></div>';
       html+='<div style="margin-top:6px">'+escH(m.descripcion)+'</div>';
-      if(m.realizadoPor)html+='<div style="font-size:11px;color:var(--muted);margin-top:2px">Realizó: '+escH(m.realizadoPor)+'</div>';
+      var meta=[];
+      if(m.realizadoPor)meta.push("Realizó: "+escH(m.realizadoPor));
+      if(m.costo>0)meta.push('<strong style="color:var(--success)">Costo: $'+m.costo.toLocaleString("es-MX",{minimumFractionDigits:2})+'</strong>');
+      if(meta.length)html+='<div style="font-size:12px;color:var(--muted);margin-top:4px">'+meta.join(" • ")+'</div>';
       html+='<button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="delMant(\''+m.id+'\')">Eliminar</button>';
       html+='</div>';
     });
@@ -716,6 +725,7 @@ function showCreateMant(){
     '<div class="field"><label>Fecha del mantenimiento</label><input id="mtFecha" type="date" value="'+todayStr+'"></div>'+
     '<div class="field"><label>Descripción del trabajo realizado *</label><textarea id="mtDesc" placeholder="Ej: Limpieza interna de polvo, cambio de pasta térmica, se reemplazó memoria RAM de 4GB por 8GB..."></textarea></div>'+
     '<div class="field"><label>Realizado por</label><input id="mtPor" placeholder="Nombre del técnico" value="'+(userRole==="tecnico"?"Técnico":"Profesor")+'"></div>'+
+    '<div class="field"><label>Costo del servicio ($)</label><input id="mtCosto" type="number" placeholder="0.00" min="0" step="0.01"></div>'+
     '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
     '<button class="btn btn-accent" onclick="saveMant()">Guardar</button></div></div>';
   document.body.appendChild(o);
@@ -727,9 +737,10 @@ function saveMant(){
   var desc=document.getElementById("mtDesc").value.trim();
   var por=document.getElementById("mtPor").value.trim();
   var fecha=document.getElementById("mtFecha").value;
+  var costo=parseFloat(document.getElementById("mtCosto").value)||0;
   if(!desc){alert("Describe el trabajo realizado");return;}
   var fechaISO=fecha?new Date(fecha+"T12:00:00").toISOString():new Date().toISOString();
-  api("action=createMant&equipo="+eq+"&tipo="+tipo+"&descripcion="+encodeURIComponent(desc)+"&realizadoPor="+encodeURIComponent(por)+"&fecha="+encodeURIComponent(fechaISO)).then(function(r){
+  api("action=createMant&equipo="+eq+"&tipo="+tipo+"&descripcion="+encodeURIComponent(desc)+"&realizadoPor="+encodeURIComponent(por)+"&fecha="+encodeURIComponent(fechaISO)+"&costo="+costo).then(function(r){
     if(r.success){
       document.querySelector(".modal-overlay").remove();
       showToast("✅ Mantenimiento registrado");
@@ -754,11 +765,14 @@ function exportMants(){
       "Tipo":TIPOS[m.tipo]||m.tipo,
       "Descripción":m.descripcion,
       "Realizado por":m.realizadoPor||"",
-      "Fecha":d.toLocaleDateString("es-MX")
+      "Fecha":d.toLocaleDateString("es-MX"),
+      "Costo":m.costo||0
     };
   });
+  var totalCosto=filtered.reduce(function(sum,m){return sum+(m.costo||0);},0);
+  rows.push({"Equipo":"","Tipo":"","Descripción":"","Realizado por":"","Fecha":"TOTAL:","Costo":totalCosto});
   var ws=XLSX.utils.json_to_sheet(rows);
-  ws["!cols"]=[{wch:8},{wch:12},{wch:60},{wch:22},{wch:12}];
+  ws["!cols"]=[{wch:8},{wch:12},{wch:60},{wch:22},{wch:12},{wch:12}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Mantenimientos");
   var suffix="";
@@ -789,9 +803,11 @@ function shareMants(){
     msg+="\n💻 *EQUIPO "+eq+"*\n";
     porEquipo[eq].forEach(function(m){
       var d=new Date(m.fecha);
-      msg+="  • "+(TIPOS[m.tipo]||m.tipo)+" ("+d.toLocaleDateString("es-MX")+")\n    "+m.descripcion+(m.realizadoPor?" — _"+m.realizadoPor+"_":"")+"\n";
+      msg+="  • "+(TIPOS[m.tipo]||m.tipo)+" ("+d.toLocaleDateString("es-MX")+")\n    "+m.descripcion+(m.realizadoPor?" — _"+m.realizadoPor+"_":"")+(m.costo>0?"\n    💰 $"+m.costo.toLocaleString("es-MX",{minimumFractionDigits:2}):"")+"\n";
     });
   });
+  var totalRep=filtered.reduce(function(sum,m){return sum+(m.costo||0);},0);
+  if(totalRep>0)msg+="\n━━━━━━━━━━━━━━━━━━━━━\n💰 *COSTO TOTAL: $"+totalRep.toLocaleString("es-MX",{minimumFractionDigits:2})+"*";
   msg+="\n━━━━━━━━━━━━━━━━━━━━━\n_Enviado desde SalaCómputo_";
   window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
 }
