@@ -152,6 +152,8 @@ var NUM_EQ=20, TECNICO_WA="";
 var sesiones=[],tickets=[],historial=[];
 var adminTab="equipos";
 var adminAuth=sessionStorage.getItem("salacomputo_admin")==="1";
+var userRole=sessionStorage.getItem("salacomputo_role")||"admin";
+var mants=[];
 var timerInterval=null;
 
 function showToast(m,d){var t=document.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(function(){t.classList.remove("show");},d||3000);}
@@ -335,17 +337,31 @@ function doAdminLogin(){
   if(!pin){err.textContent="Ingrese el PIN";return;}
   err.textContent="Verificando...";
   api("action=adminLogin&pin="+encodeURIComponent(pin)).then(function(r){
-    if(r.success){adminAuth=true;sessionStorage.setItem("salacomputo_admin","1");err.textContent="";show("viewAdmin");initAdmin();}
+    if(r.success){
+      adminAuth=true;userRole=r.role||"admin";
+      sessionStorage.setItem("salacomputo_admin","1");
+      sessionStorage.setItem("salacomputo_role",userRole);
+      err.textContent="";show("viewAdmin");initAdmin();
+    }
     else err.textContent="❌ "+r.error;
   }).catch(function(e){err.textContent="❌ "+e.message;});
 }
 
-function adminLogout(){adminAuth=false;sessionStorage.removeItem("salacomputo_admin");show("viewAdminLogin");document.getElementById("adminPin").value="";}
+function adminLogout(){adminAuth=false;sessionStorage.removeItem("salacomputo_admin");sessionStorage.removeItem("salacomputo_role");show("viewAdminLogin");document.getElementById("adminPin").value="";}
 
-function initAdmin(){adminTab="equipos";renderAdminTabs();loadAdminData();}
+function initAdmin(){
+  adminTab=userRole==="tecnico"?"mantenimiento":"equipos";
+  document.querySelector("#viewAdmin .header small").textContent=userRole==="tecnico"?"Panel del Técnico":"Panel del Profesor";
+  renderAdminTabs();loadAdminData();
+}
 
 function renderAdminTabs(){
-  var tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["historial","📋 Historial"]];
+  var tabs;
+  if(userRole==="tecnico"){
+    tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["mantenimiento","🔧 Mantenimiento"]];
+  }else{
+    tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["historial","📋 Historial"],["mantenimiento","🔧 Mantenimiento"]];
+  }
   document.getElementById("adminTabs").innerHTML=tabs.map(function(t){
     return'<button class="'+(adminTab===t[0]?"active":"")+'" onclick="switchAdminTab(\''+t[0]+'\')">'+t[1]+'</button>';
   }).join("");
@@ -358,6 +374,7 @@ function loadAdminData(){
   Promise.all([
     api("action=getEstado").then(function(r){if(r.success){sesiones=r.sesiones;tickets=r.tickets;}}),
     api("action=getHistorial").then(function(r){if(r.success)historial=r.sesiones;}),
+    api("action=getMants").then(function(r){if(r.success)mants=r.mants;}),
     loadConfig()
   ]).then(function(){renderAdminContent();showToast("✅ Actualizado");}).catch(function(e){showToast("❌ "+e.message,4000);});
 }
@@ -365,6 +382,7 @@ function loadAdminData(){
 function renderAdminContent(){
   if(adminTab==="equipos")renderEquipos();
   else if(adminTab==="tickets")renderTickets();
+  else if(adminTab==="mantenimiento")renderMantenimiento();
   else renderHistorial();
 }
 
@@ -619,12 +637,173 @@ function exportHistorial(){
   showToast("✅ "+filtered.length+" registros exportados");
 }
 
+// ══════════════════ MANTENIMIENTO ══════════════════
+var mantFilter={desde:"",hasta:"",equipo:"",tipo:""};
+var MANT_TIPOS={preventivo:"🛡️ Preventivo",correctivo:"🔧 Correctivo",limpieza:"🧹 Limpieza"};
+var MANT_BADGE={preventivo:"badge-ocupado",correctivo:"badge-falla",limpieza:"badge-libre"};
+
+function getFilteredMants(){
+  return mants.filter(function(m){
+    if(mantFilter.equipo && Number(m.equipo)!==Number(mantFilter.equipo))return false;
+    if(mantFilter.tipo && m.tipo!==mantFilter.tipo)return false;
+    var d=new Date(m.fecha);
+    if(mantFilter.desde){if(d<new Date(mantFilter.desde+"T00:00:00"))return false;}
+    if(mantFilter.hasta){if(d>new Date(mantFilter.hasta+"T23:59:59"))return false;}
+    return true;
+  });
+}
+
+function renderMantenimiento(){
+  var c=document.getElementById("adminContent");
+  var eqOpts='<option value="">Todos</option>';
+  for(var i=1;i<=NUM_EQ;i++)eqOpts+='<option value="'+i+'"'+(String(mantFilter.equipo)===String(i)?" selected":"")+'>Equipo '+i+'</option>';
+  var tipoOpts='<option value="">Todos</option>';
+  Object.keys(MANT_TIPOS).forEach(function(t){tipoOpts+='<option value="'+t+'"'+(mantFilter.tipo===t?" selected":"")+'>'+MANT_TIPOS[t]+'</option>';});
+
+  var filtered=getFilteredMants();
+
+  var html='<button class="btn btn-accent" style="margin-bottom:12px" onclick="showCreateMant()">🔧 Registrar mantenimiento</button>';
+
+  html+='<div class="card"><div class="section-label">🔍 Filtros</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  html+='<div class="field" style="margin-bottom:8px"><label>Desde</label><input id="fmDesde" type="date" value="'+mantFilter.desde+'" onchange="applyMantFilter()"></div>';
+  html+='<div class="field" style="margin-bottom:8px"><label>Hasta</label><input id="fmHasta" type="date" value="'+mantFilter.hasta+'" onchange="applyMantFilter()"></div>';
+  html+='<div class="field" style="margin-bottom:8px"><label>Equipo</label><select id="fmEquipo" onchange="applyMantFilter()">'+eqOpts+'</select></div>';
+  html+='<div class="field" style="margin-bottom:8px"><label>Tipo</label><select id="fmTipo" onchange="applyMantFilter()">'+tipoOpts+'</select></div>';
+  html+='</div>';
+  html+='<button class="btn btn-outline btn-sm" onclick="mantFilter={desde:\'\',hasta:\'\',equipo:\'\',tipo:\'\'};renderMantenimiento()">Limpiar filtros</button>';
+  html+='</div>';
+
+  html+='<div class="actions-row" style="margin-bottom:12px">';
+  html+='<button class="btn btn-success" onclick="exportMants()" '+(filtered.length?"":"disabled")+'>📥 Excel ('+filtered.length+')</button>';
+  html+='<button class="btn btn-whatsapp" onclick="shareMants()" '+(filtered.length?"":"disabled")+'>📱 WhatsApp</button>';
+  html+='</div>';
+
+  if(!filtered.length){
+    html+='<div style="text-align:center;padding:40px;color:var(--muted)"><div style="font-size:40px">🔧</div><div style="font-weight:600;margin-top:8px">Sin mantenimientos'+(mants.length?" con estos filtros":" registrados")+'</div></div>';
+  }else{
+    html+='<div class="card"><div class="section-label">Historial de mantenimiento ('+filtered.length+' de '+mants.length+')</div>';
+    filtered.forEach(function(m){
+      html+='<div class="tk-row"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
+      html+='<div><strong>Equipo '+m.equipo+'</strong> <span class="badge '+(MANT_BADGE[m.tipo]||"badge-baja")+'">'+(MANT_TIPOS[m.tipo]||m.tipo)+'</span></div>';
+      html+='<span style="font-size:11px;color:var(--muted)">'+fmtDT(m.fecha)+'</span></div>';
+      html+='<div style="margin-top:6px">'+escH(m.descripcion)+'</div>';
+      if(m.realizadoPor)html+='<div style="font-size:11px;color:var(--muted);margin-top:2px">Realizó: '+escH(m.realizadoPor)+'</div>';
+      html+='<button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="delMant(\''+m.id+'\')">Eliminar</button>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  c.innerHTML=html;
+}
+
+function applyMantFilter(){
+  mantFilter.desde=document.getElementById("fmDesde").value;
+  mantFilter.hasta=document.getElementById("fmHasta").value;
+  mantFilter.equipo=document.getElementById("fmEquipo").value;
+  mantFilter.tipo=document.getElementById("fmTipo").value;
+  renderMantenimiento();
+}
+
+function showCreateMant(){
+  var o=document.createElement("div");o.className="modal-overlay";
+  var opts="";for(var i=1;i<=NUM_EQ;i++)opts+='<option value="'+i+'">Equipo '+i+'</option>';
+  var today=new Date();
+  var todayStr=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+  o.innerHTML='<div class="modal"><h3>🔧 Registrar Mantenimiento</h3>'+
+    '<div class="field" style="margin-top:12px"><label>Equipo *</label><select id="mtEq">'+opts+'</select></div>'+
+    '<div class="field"><label>Tipo *</label><select id="mtTipo"><option value="preventivo">🛡️ Preventivo</option><option value="correctivo">🔧 Correctivo</option><option value="limpieza">🧹 Limpieza</option></select></div>'+
+    '<div class="field"><label>Fecha del mantenimiento</label><input id="mtFecha" type="date" value="'+todayStr+'"></div>'+
+    '<div class="field"><label>Descripción del trabajo realizado *</label><textarea id="mtDesc" placeholder="Ej: Limpieza interna de polvo, cambio de pasta térmica, se reemplazó memoria RAM de 4GB por 8GB..."></textarea></div>'+
+    '<div class="field"><label>Realizado por</label><input id="mtPor" placeholder="Nombre del técnico" value="'+(userRole==="tecnico"?"Técnico":"Profesor")+'"></div>'+
+    '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
+    '<button class="btn btn-accent" onclick="saveMant()">Guardar</button></div></div>';
+  document.body.appendChild(o);
+}
+
+function saveMant(){
+  var eq=document.getElementById("mtEq").value;
+  var tipo=document.getElementById("mtTipo").value;
+  var desc=document.getElementById("mtDesc").value.trim();
+  var por=document.getElementById("mtPor").value.trim();
+  var fecha=document.getElementById("mtFecha").value;
+  if(!desc){alert("Describe el trabajo realizado");return;}
+  var fechaISO=fecha?new Date(fecha+"T12:00:00").toISOString():new Date().toISOString();
+  api("action=createMant&equipo="+eq+"&tipo="+tipo+"&descripcion="+encodeURIComponent(desc)+"&realizadoPor="+encodeURIComponent(por)+"&fecha="+encodeURIComponent(fechaISO)).then(function(r){
+    if(r.success){
+      document.querySelector(".modal-overlay").remove();
+      showToast("✅ Mantenimiento registrado");
+      loadAdminData();
+    }else showToast("❌ "+r.error,4000);
+  }).catch(function(e){showToast("❌ "+e.message,4000);});
+}
+
+function delMant(id){
+  if(!confirm("¿Eliminar este registro de mantenimiento?"))return;
+  api("action=delMant&id="+encodeURIComponent(id)).then(function(){showToast("Registro eliminado");loadAdminData();});
+}
+
+function exportMants(){
+  var filtered=getFilteredMants();
+  if(!filtered.length){showToast("Sin registros para exportar");return;}
+  var TIPOS={preventivo:"Preventivo",correctivo:"Correctivo",limpieza:"Limpieza"};
+  var rows=filtered.map(function(m){
+    var d=new Date(m.fecha);
+    return{
+      "Equipo":m.equipo,
+      "Tipo":TIPOS[m.tipo]||m.tipo,
+      "Descripción":m.descripcion,
+      "Realizado por":m.realizadoPor||"",
+      "Fecha":d.toLocaleDateString("es-MX")
+    };
+  });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  ws["!cols"]=[{wch:8},{wch:12},{wch:60},{wch:22},{wch:12}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Mantenimientos");
+  var suffix="";
+  if(mantFilter.equipo)suffix+="_Eq"+mantFilter.equipo;
+  if(mantFilter.tipo)suffix+="_"+mantFilter.tipo;
+  if(mantFilter.desde||mantFilter.hasta)suffix+="_"+(mantFilter.desde||"inicio")+"_a_"+(mantFilter.hasta||"hoy");
+  XLSX.writeFile(wb,"Mantenimiento_SalaComputo"+suffix+".xlsx");
+  showToast("✅ "+filtered.length+" registros exportados");
+}
+
+function shareMants(){
+  var filtered=getFilteredMants();
+  if(!filtered.length){showToast("Sin registros para compartir");return;}
+  var TIPOS={preventivo:"🛡️ Preventivo",correctivo:"🔧 Correctivo",limpieza:"🧹 Limpieza"};
+  var titulo="🔧 *REPORTE DE MANTENIMIENTO - SALA DE CÓMPUTO*";
+  var filtros="";
+  if(mantFilter.equipo)filtros+="\n💻 Equipo: "+mantFilter.equipo;
+  if(mantFilter.tipo)filtros+="\n📌 Tipo: "+(TIPOS[mantFilter.tipo]||mantFilter.tipo);
+  if(mantFilter.desde||mantFilter.hasta)filtros+="\n📅 Periodo: "+(mantFilter.desde||"inicio")+" a "+(mantFilter.hasta||"hoy");
+  var msg=titulo+"\n━━━━━━━━━━━━━━━━━━━━━"+filtros+"\n\n*"+filtered.length+" registro(s):*\n";
+  // Agrupar por equipo
+  var porEquipo={};
+  filtered.forEach(function(m){
+    if(!porEquipo[m.equipo])porEquipo[m.equipo]=[];
+    porEquipo[m.equipo].push(m);
+  });
+  Object.keys(porEquipo).sort(function(a,b){return a-b;}).forEach(function(eq){
+    msg+="\n💻 *EQUIPO "+eq+"*\n";
+    porEquipo[eq].forEach(function(m){
+      var d=new Date(m.fecha);
+      msg+="  • "+(TIPOS[m.tipo]||m.tipo)+" ("+d.toLocaleDateString("es-MX")+")\n    "+m.descripcion+(m.realizadoPor?" — _"+m.realizadoPor+"_":"")+"\n";
+    });
+  });
+  msg+="\n━━━━━━━━━━━━━━━━━━━━━\n_Enviado desde SalaCómputo_";
+  window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+}
+
 function showAdminConfig(){
+  if(userRole!=="admin"){showToast("⚠️ Solo el administrador puede cambiar la configuración");return;}
   var o=document.createElement("div");o.className="modal-overlay";
   o.innerHTML='<div class="modal"><h3>⚙️ Configuración</h3>'+
     '<div class="field" style="margin-top:12px"><label>Número de equipos en la sala</label><input id="cfgNum" type="number" value="'+NUM_EQ+'" min="1" max="40"></div>'+
     '<div class="field"><label>WhatsApp del técnico (10 dígitos)</label><input id="cfgTec" type="tel" value="'+escH(TECNICO_WA)+'" placeholder="9991234567"></div>'+
     '<div class="field"><label>Cambiar PIN de administrador</label><input id="cfgPin" type="password" placeholder="Nuevo PIN (dejar vacío para no cambiar)"></div>'+
+    '<div class="field"><label>Cambiar PIN del técnico</label><input id="cfgTecPin" type="password" placeholder="Nuevo PIN técnico (dejar vacío para no cambiar)"></div>'+
     '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="saveAdminConfig()">Guardar</button></div></div>';
   document.body.appendChild(o);
@@ -634,11 +813,13 @@ function saveAdminConfig(){
   var num=document.getElementById("cfgNum").value;
   var tec=document.getElementById("cfgTec").value.trim();
   var pin=document.getElementById("cfgPin").value.trim();
+  var tecPin=document.getElementById("cfgTecPin").value.trim();
   var calls=[
     api("action=updateConfig&key=num_equipos&value="+encodeURIComponent(num)),
     api("action=updateConfig&key=tecnico_whatsapp&value="+encodeURIComponent(tec))
   ];
   if(pin)calls.push(api("action=updateConfig&key=admin_pin&value="+encodeURIComponent(pin)));
+  if(tecPin)calls.push(api("action=updateConfig&key=tecnico_pin&value="+encodeURIComponent(tecPin)));
   Promise.all(calls).then(function(){
     NUM_EQ=parseInt(num)||20;TECNICO_WA=tec;
     document.querySelector(".modal-overlay").remove();
