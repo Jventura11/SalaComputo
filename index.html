@@ -351,7 +351,8 @@ function adminLogout(){adminAuth=false;sessionStorage.removeItem("salacomputo_ad
 
 function initAdmin(){
   adminTab=userRole==="tecnico"?"tickets":"equipos";
-  document.querySelector("#viewAdmin .header small").textContent=userRole==="tecnico"?"Panel del Técnico":"Panel del Profesor";
+  var LBL={admin:"Panel del Administrador",profesor:"Panel del Profesor",tecnico:"Panel del Técnico"};
+  document.querySelector("#viewAdmin .header small").textContent=LBL[userRole]||LBL.admin;
   renderAdminTabs();loadAdminData();
 }
 
@@ -359,6 +360,8 @@ function renderTabs_admin(){
   var tabs;
   if(userRole==="tecnico"){
     tabs=[["tickets","🎫 Tickets"],["mantenimiento","🔧 Mantenimiento"]];
+  }else if(userRole==="profesor"){
+    tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["historial","📋 Historial"]];
   }else{
     tabs=[["equipos","🖥️ Equipos"],["tickets","🎫 Tickets"],["historial","📋 Historial"],["mantenimiento","🔧 Mantenimiento"]];
   }
@@ -374,11 +377,13 @@ function loadAdminData(){
   showToast("⏳ Actualizando...");
   var calls=[
     api("action=getEstado").then(function(r){if(r.success){sesiones=r.sesiones;tickets=r.tickets;}}),
-    api("action=getMants").then(function(r){if(r.success)mants=r.mants;}),
     loadConfig()
   ];
   if(userRole!=="tecnico"){
     calls.push(api("action=getHistorial").then(function(r){if(r.success)historial=r.sesiones;}));
+  }
+  if(userRole!=="profesor"){
+    calls.push(api("action=getMants").then(function(r){if(r.success)mants=r.mants;}));
   }
   Promise.all(calls).then(function(){renderAdminContent();showToast("✅ Actualizado");}).catch(function(e){showToast("❌ "+e.message,4000);});
 }
@@ -819,6 +824,7 @@ function showAdminConfig(){
     '<div class="field" style="margin-top:12px"><label>Número de equipos en la sala</label><input id="cfgNum" type="number" value="'+NUM_EQ+'" min="1" max="40"></div>'+
     '<div class="field"><label>WhatsApp del técnico (10 dígitos)</label><input id="cfgTec" type="tel" value="'+escH(TECNICO_WA)+'" placeholder="9991234567"></div>'+
     '<div class="field"><label>Cambiar PIN de administrador</label><input id="cfgPin" type="password" placeholder="Nuevo PIN (dejar vacío para no cambiar)"></div>'+
+    '<div class="field"><label>Cambiar PIN del profesor</label><input id="cfgProfPin" type="password" placeholder="Nuevo PIN profesor (dejar vacío para no cambiar)"></div>'+
     '<div class="field"><label>Cambiar PIN del técnico</label><input id="cfgTecPin" type="password" placeholder="Nuevo PIN técnico (dejar vacío para no cambiar)"></div>'+
     '<div class="actions-row"><button class="btn btn-outline" onclick="this.closest(\'.modal-overlay\').remove()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="saveAdminConfig()">Guardar</button></div></div>';
@@ -835,6 +841,8 @@ function saveAdminConfig(){
     api("action=updateConfig&key=tecnico_whatsapp&value="+encodeURIComponent(tec))
   ];
   if(pin)calls.push(api("action=updateConfig&key=admin_pin&value="+encodeURIComponent(pin)));
+  var profPin=document.getElementById("cfgProfPin").value.trim();
+  if(profPin)calls.push(api("action=updateConfig&key=profesor_pin&value="+encodeURIComponent(profPin)));
   if(tecPin)calls.push(api("action=updateConfig&key=tecnico_pin&value="+encodeURIComponent(tecPin)));
   Promise.all(calls).then(function(){
     NUM_EQ=parseInt(num)||20;TECNICO_WA=tec;
