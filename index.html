@@ -576,8 +576,10 @@ function renderHistorial(){
   }else{
     html+='<div class="card"><div class="section-label">Bitácora de uso ('+filtered.length+' de '+historial.length+' sesiones)</div>';
     filtered.forEach(function(s){
-      html+='<div class="hist-row"><div><strong>Eq. '+s.equipo+'</strong> — '+escH(s.alumno1)+(s.alumno2?" y "+escH(s.alumno2):"")+(s.activa?' <span class="badge badge-ocupado">Activa</span>':'')+'</div>';
-      html+='<div style="color:var(--muted)">'+fmtDT(s.inicio)+(s.fin?" → "+fmtDT(s.fin):"")+'</div></div>';
+      html+='<div class="hist-row"><div style="flex:1"><strong>Eq. '+s.equipo+'</strong> — '+escH(s.alumno1)+(s.alumno2?" y "+escH(s.alumno2):"")+(s.activa?' <span class="badge badge-ocupado">Activa</span>':'')+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:8px"><span style="color:var(--muted)">'+fmtDT(s.inicio)+(s.fin?" → "+fmtDT(s.fin):"")+'</span>';
+      if(userRole==="admin")html+='<button class="btn-ghost" style="color:var(--danger);font-size:16px;padding:0" onclick="delSesion(\''+s.id+'\')" title="Eliminar registro">🗑️</button>';
+      html+='</div></div>';
     });
     html+='</div>';
   }
@@ -610,6 +612,17 @@ function quickFilter(tipo){
   }
   else{histFilter={desde:"",hasta:"",equipo:"",buscar:""};}
   renderHistorial();
+}
+
+function delSesion(id){
+  if(!confirm("¿Eliminar este registro de la bitácora? Esta acción no se puede deshacer."))return;
+  api("action=delSesion&id="+encodeURIComponent(id)).then(function(r){
+    if(r.success){
+      historial=historial.filter(function(s){return s.id!==id;});
+      renderHistorial();
+      showToast("✅ Registro eliminado");
+    }else showToast("❌ "+(r.error||"Error"),4000);
+  }).catch(function(e){showToast("❌ "+e.message,4000);});
 }
 
 function calcDuracion(s){
