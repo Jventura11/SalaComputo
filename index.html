@@ -653,7 +653,7 @@ var MANT_BADGE={preventivo:"badge-ocupado",correctivo:"badge-falla",limpieza:"ba
 
 function getFilteredMants(){
   return mants.filter(function(m){
-    if(mantFilter.equipo && Number(m.equipo)!==Number(mantFilter.equipo))return false;
+    if(mantFilter.equipo && String(m.equipo)!==String(mantFilter.equipo))return false;
     if(mantFilter.tipo && m.tipo!==mantFilter.tipo)return false;
     var d=new Date(m.fecha);
     if(mantFilter.desde){if(d<new Date(mantFilter.desde+"T00:00:00"))return false;}
@@ -666,6 +666,7 @@ function renderMantenimiento(){
   var c=document.getElementById("adminContent");
   var eqOpts='<option value="">Todos</option>';
   for(var i=1;i<=NUM_EQ;i++)eqOpts+='<option value="'+i+'"'+(String(mantFilter.equipo)===String(i)?" selected":"")+'>Equipo '+i+'</option>';
+  getCustomEquipos().forEach(function(ce){eqOpts+='<option value="'+escH(ce)+'"'+(mantFilter.equipo===ce?" selected":"")+'>'+escH(ce)+'</option>';});
   var tipoOpts='<option value="">Todos</option>';
   Object.keys(MANT_TIPOS).forEach(function(t){tipoOpts+='<option value="'+t+'"'+(mantFilter.tipo===t?" selected":"")+'>'+MANT_TIPOS[t]+'</option>';});
 
@@ -696,7 +697,7 @@ function renderMantenimiento(){
     html+='<div class="card"><div class="section-label">Historial de mantenimiento ('+filtered.length+' de '+mants.length+')</div>';
     filtered.forEach(function(m){
       html+='<div class="tk-row"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
-      html+='<div><strong>Equipo '+m.equipo+'</strong> <span class="badge '+(MANT_BADGE[m.tipo]||"badge-baja")+'">'+(MANT_TIPOS[m.tipo]||m.tipo)+'</span></div>';
+      html+='<div><strong>'+escH(eqLabel(m.equipo))+'</strong> <span class="badge '+(MANT_BADGE[m.tipo]||"badge-baja")+'">'+(MANT_TIPOS[m.tipo]||m.tipo)+'</span></div>';
       html+='<span style="font-size:11px;color:var(--muted)">'+fmtDT(m.fecha)+'</span></div>';
       html+='<div style="margin-top:6px">'+escH(m.descripcion)+'</div>';
       var meta=[];
@@ -719,13 +720,28 @@ function applyMantFilter(){
   renderMantenimiento();
 }
 
+// Etiqueta: números → "Equipo N"; nombres libres → tal cual (ej. "Administrativo_1")
+function eqLabel(e){
+  return /^\d+$/.test(String(e)) ? "Equipo "+e : String(e);
+}
+// Equipos personalizados ya registrados en mantenimientos (para reusar en filtros)
+function getCustomEquipos(){
+  var set={};
+  mants.forEach(function(m){if(!/^\d+$/.test(String(m.equipo)))set[m.equipo]=1;});
+  return Object.keys(set).sort();
+}
+
 function showCreateMant(){
   var o=document.createElement("div");o.className="modal-overlay";
   var opts="";for(var i=1;i<=NUM_EQ;i++)opts+='<option value="'+i+'">Equipo '+i+'</option>';
+  // Equipos personalizados previos, para reutilizarlos fácil
+  getCustomEquipos().forEach(function(ce){opts+='<option value="'+escH(ce)+'">'+escH(ce)+'</option>';});
+  opts+='<option value="__otro__">➕ Otro (escribir nombre)...</option>';
   var today=new Date();
   var todayStr=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
   o.innerHTML='<div class="modal"><h3>🔧 Registrar Mantenimiento</h3>'+
-    '<div class="field" style="margin-top:12px"><label>Equipo *</label><select id="mtEq">'+opts+'</select></div>'+
+    '<div class="field" style="margin-top:12px"><label>Equipo *</label><select id="mtEq" onchange="document.getElementById(\'mtEqOtroWrap\').classList.toggle(\'hidden\',this.value!==\'__otro__\')">'+opts+'</select></div>'+
+    '<div class="field hidden" id="mtEqOtroWrap"><label>Nombre del equipo *</label><input id="mtEqOtro" placeholder="Ej: Administrativo_1, Dirección, Laptop_Secretaría"></div>'+
     '<div class="field"><label>Tipo *</label><select id="mtTipo"><option value="preventivo">🛡️ Preventivo</option><option value="correctivo">🔧 Correctivo</option><option value="limpieza">🧹 Limpieza</option></select></div>'+
     '<div class="field"><label>Fecha del mantenimiento</label><input id="mtFecha" type="date" value="'+todayStr+'"></div>'+
     '<div class="field"><label>Descripción del trabajo realizado *</label><textarea id="mtDesc" placeholder="Ej: Limpieza interna de polvo, cambio de pasta térmica, se reemplazó memoria RAM de 4GB por 8GB..."></textarea></div>'+
@@ -738,6 +754,10 @@ function showCreateMant(){
 
 function saveMant(){
   var eq=document.getElementById("mtEq").value;
+  if(eq==="__otro__"){
+    eq=document.getElementById("mtEqOtro").value.trim();
+    if(!eq){alert("Escribe el nombre del equipo");return;}
+  }
   var tipo=document.getElementById("mtTipo").value;
   var desc=document.getElementById("mtDesc").value.trim();
   var por=document.getElementById("mtPor").value.trim();
@@ -766,7 +786,7 @@ function exportMants(){
   var rows=filtered.map(function(m){
     var d=new Date(m.fecha);
     return{
-      "Equipo":m.equipo,
+      "Equipo":eqLabel(m.equipo),
       "Tipo":TIPOS[m.tipo]||m.tipo,
       "Descripción":m.descripcion,
       "Realizado por":m.realizadoPor||"",
@@ -781,7 +801,7 @@ function exportMants(){
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Mantenimientos");
   var suffix="";
-  if(mantFilter.equipo)suffix+="_Eq"+mantFilter.equipo;
+  if(mantFilter.equipo)suffix+="_"+String(mantFilter.equipo).replace(/[^a-zA-Z0-9_]/g,"");
   if(mantFilter.tipo)suffix+="_"+mantFilter.tipo;
   if(mantFilter.desde||mantFilter.hasta)suffix+="_"+(mantFilter.desde||"inicio")+"_a_"+(mantFilter.hasta||"hoy");
   XLSX.writeFile(wb,"Mantenimiento_SalaComputo"+suffix+".xlsx");
@@ -804,8 +824,14 @@ function shareMants(){
     if(!porEquipo[m.equipo])porEquipo[m.equipo]=[];
     porEquipo[m.equipo].push(m);
   });
-  Object.keys(porEquipo).sort(function(a,b){return a-b;}).forEach(function(eq){
-    msg+="\n💻 *EQUIPO "+eq+"*\n";
+  Object.keys(porEquipo).sort(function(a,b){
+    var na=/^\d+$/.test(a),nb=/^\d+$/.test(b);
+    if(na&&nb)return a-b;
+    if(na)return -1;
+    if(nb)return 1;
+    return a.localeCompare(b);
+  }).forEach(function(eq){
+    msg+="\n💻 *"+eqLabel(eq).toUpperCase()+"*\n";
     porEquipo[eq].forEach(function(m){
       var d=new Date(m.fecha);
       msg+="  • "+(TIPOS[m.tipo]||m.tipo)+" ("+d.toLocaleDateString("es-MX")+")\n    "+m.descripcion+(m.realizadoPor?" — _"+m.realizadoPor+"_":"")+(m.costo>0?"\n    💰 $"+m.costo.toLocaleString("es-MX",{minimumFractionDigits:2}):"")+"\n";
